@@ -42,8 +42,11 @@ if raster_data:
     g = nx.DiGraph(incoming_graph_data=cnm.T)
 
 elif vector_data:
-    gpkg_fn = r"C:\Users\03125327\github\canal_networks\qgis\final_lines.gpkg"
-    fn_dtm10x10 = r"C:\Users\03125327\github\canal_networks\qgis\dtm_10x10.tif"
+    # gpkg_fn = r"C:\Users\03125327\github\canal_networks\qgis\final_lines.gpkg"
+    # fn_dtm10x10 = r"C:\Users\03125327\github\canal_networks\qgis\dtm_10x10.tif"
+
+    gpkg_fn = r"/home/txart/Programming/GitHub/canal_net/qgis/final_lines.gpkg"
+    fn_dtm10x10 = r"/home/txart/Programming/data/dtm_10x10.tif"
 
     graph = preprocess_data.read_lines_and_raster_and_produce_dirty_graph(
         gpkg_fn, fn_dtm10x10)
