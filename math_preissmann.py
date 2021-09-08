@@ -478,7 +478,7 @@ def build_SS_F(y, Q, q, B, general_params, channel_network_params):
     return F_u
 
 
-def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, general_params, channel_network_params):
+def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, general_params, channel_network_params, verbose=False):
 
     inexact_iter_counter = 0
     compute_and_factorize_jacobian = True
@@ -522,7 +522,8 @@ def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, 
         inexact_iter_counter += 1
 
         if np.linalg.norm(x) < general_params.rel_tol*np.linalg.norm(utilities.interweave_vectors(y_previous, Q_previous)) + general_params.abs_tol:
-            print('\n>>> Inexact Newton-Rhapson converged after ', i, ' iterations')
+            if verbose:
+                print('\n>>> Inexact Newton-Rhapson converged after ', i, ' iterations')
             return y, Q
         elif np.any(np.isnan(y) | np.isnan(Q)):
             print(
@@ -533,7 +534,6 @@ def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, 
 
 
 def simulate_one_component(general_params, g_com):
-    print('simulating')
     # nodelist forces the adjacency matrix to have an order.
     nodelist = list(g_com.nodes)
     # 'float64' is required by Numba; transpose is needed by difference with NetworkX
