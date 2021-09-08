@@ -26,6 +26,7 @@ import math_preissmann
 import SS_math_preissmann
 import classes
 import preprocess_data
+import main_mp
 
 
 # %% PARAMETERS and DATA
@@ -42,11 +43,11 @@ if raster_data:
     g = nx.DiGraph(incoming_graph_data=cnm.T)
 
 elif vector_data:
-    # gpkg_fn = r"C:\Users\03125327\github\canal_networks\qgis\final_lines.gpkg"
-    # fn_dtm10x10 = r"C:\Users\03125327\github\canal_networks\qgis\dtm_10x10.tif"
+    gpkg_fn = r"C:\Users\03125327\github\canal_net\qgis\final_lines.gpkg"
+    fn_dtm10x10 = r"C:\Users\03125327\Documents\qgis\canal_networks\dtm_10x10.tif"
 
-    gpkg_fn = r"/home/txart/Programming/GitHub/canal_net/qgis/final_lines.gpkg"
-    fn_dtm10x10 = r"/home/txart/Programming/data/dtm_10x10.tif"
+    #gpkg_fn = r"/home/txart/Programming/GitHub/canal_net/qgis/final_lines.gpkg"
+    #fn_dtm10x10 = r"/home/txart/Programming/data/dtm_10x10.tif"
 
     graph = preprocess_data.read_lines_and_raster_and_produce_dirty_graph(
         gpkg_fn, fn_dtm10x10)
@@ -93,11 +94,7 @@ long_component_graphs = [g for g in component_graphs if len(g.nodes) > 3]
 parallel_processing = True
 if parallel_processing:
     if __name__ == '__main__':
-        with mp.Pool(processes=1) as pool:
-            print('simulating000')
-            results = pool.starmap(math_preissmann.simulate_one_component, tqdm(
-                [(general_params, g_com) for g_com in long_component_graphs[-10:]]))
-        print(results[-1])
+        main_mp.multiple_processes(general_params, long_component_graphs)
 
 else:
     y_results = {}
