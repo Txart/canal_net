@@ -11,6 +11,7 @@ import scipy.sparse
 import pandas as pd
 import geopandas
 import networkx as nx
+import pickle
 
 import utilities
 
@@ -551,17 +552,31 @@ def clean_graph_from_spy_nodes(graph, mode):
 
     return graph
 
-   # Activate this to run this module as main
-# if __name__== '__main__':
-#    datafolder = r"C:\Users\L1817\Dropbox\PhD\Computation\Indonesia_WaterTable\Winrock\Canal_Block_Data\GIS_files\Stratification_layers"
-#    preprocess_datafolder = r"C:\Users\L1817\Dropbox\PhD\Computation\Indonesia_WaterTable\Winrock\preprocess"
-#    dem_rst_fn = r"\dem_clip_cean.tif"
-#    can_rst_fn = r"\can_rst_clipped.tif"
-#
-#    cm, cr, c_to_r_list = gen_can_matrix_and_raster_from_raster(can_rst_fn=preprocess_datafolder+can_rst_fn,
-#                                                                dem_rst_fn=datafolder+dem_rst_fn)
-#    # Pickle outcome!
-##    import pickle
-#    pickle_folder = r"C:\Users\L1817\Winrock"
-#    with open(pickle_folder + r'\50x50_DEM_and_canals.pkl', 'w') as f:
-#        pickle.dump([cm, cr, c_to_r_list], f)
+
+def compute_channel_network_graph(gpkg_fn, fn_dtm10x10):
+    # This takes a long time! (approx. 1hour)
+    # 1st, clean from streange junctions, then clean from spy nodes
+    graph = read_lines_and_raster_and_produce_dirty_graph(
+        gpkg_fn, fn_dtm10x10)
+    graph_clean = clean_graph_from_strange_junctions(graph)
+    graph_clean = clean_graph_from_spy_nodes(
+        graph_clean.copy(), mode='delete_all')
+    pickle.dump(graph_clean, open("canal_network_matrix.p", "wb"))
+
+    return graph_clean.copy()
+
+
+def load_graph(load_from_pickled=True):
+    if load_from_pickled:
+        graph = pickle.load(open("canal_network_matrix.p", "rb"))
+    else:
+        # Windows
+        gpkg_fn = r"C:\Users\03125327\github\canal_net\qgis\final_lines.gpkg"
+        fn_dtm10x10 = r"C:\Users\03125327\Documents\qgis\canal_networks\dtm_10x10.tif"
+        # Linux -own computer-
+        #gpkg_fn = r"/home/txart/Programming/GitHub/canal_net/qgis/final_lines.gpkg"
+        #fn_dtm10x10 = r"/home/txart/Programming/data/dtm_10x10.tif"
+
+        graph = compute_channel_network_graph(gpkg_fn, fn_dtm10x10)
+
+    return graph

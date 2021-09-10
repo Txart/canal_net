@@ -50,16 +50,7 @@ class ClassGeom:
         self.cnm = nx.to_numpy_array(graph).astype('float64').T
         pass
 
-# %% Load graph data
-gpkg_fn = r"C:\Users\03125327\github\canal_networks\qgis\final_lines.gpkg"
-fn_dtm10x10 = r"C:\Users\03125327\github\canal_networks\qgis\dtm_10x10.tif"
 
-graph = preprocess_data.read_lines_and_raster_and_produce_dirty_graph(
-    gpkg_fn, fn_dtm10x10)
-
-graph_clean = pickle.load(open("canal_network_matrix.p", "rb"))
-
-cl = ClassOne(dx=50)
 # %% Run
 
 if __name__ == '__main__':
@@ -73,7 +64,7 @@ if __name__ == '__main__':
         tstart = time.time()
         res = pool.map(f, range(100))
         print(f'>>>> map took {time.time() - tstart} seconds')
-        print(res)
+        print(type(res))
 
         # tstart = time.time()
         # res = pool.starmap_async(graf, tqdm.tqdm(
@@ -84,7 +75,7 @@ if __name__ == '__main__':
         
         tstart = time.time()
         res = pool.starmap(numbis, tqdm.tqdm(
-            [(np.random.rand(100), np.random.rand(100)) for _ in range(10)]))
+            [(np.random.rand(5), np.random.rand(5)) for _ in range(10)]))
         print(f'starmap on numba took {time.time() - tstart} seconds')
         print(res)
 

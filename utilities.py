@@ -1,7 +1,9 @@
 import numpy as np
+import pandas as pd
 import geopandas
 from numba import njit
 from numpy.core.fromnumeric import nonzero
+import networkx as nx
 
 
 def merge_two_dictionaries(dict1, dict2):
@@ -331,6 +333,12 @@ def pad_array_by_interweaving(array, position_zeroes=('right', 'bottom')):
     elif position_zeroes[0] == 'right':
         return interweave_matrices(temp.T, np.zeros_like(temp.T)).T
 
+def find_graph_components(graph):
+    component_graphs = [graph.subgraph(c).copy() for c in sorted(
+        nx.weakly_connected_components(graph), key=len, reverse=True)]
+    # Remove components with fewer than 3 nodes
+    return [g for g in component_graphs if len(g.nodes) > 3]
+
 #%% Read shapefile type of data for the channel network
 
 def get_slope_directed_edges_with_node_number_name(lines_gpkg, dict_coords_to_number_nodes, dict_coords_to_height_nodes):
@@ -396,3 +404,41 @@ def permute_vector(permutation_vector, vector):
     # Example: if perm vector is [0,3,4,2]
     # It performs the permutation [a,b,c,d] -> [a, c, d, b]
     return vector[permutation_vector]
+
+def convert_networkx_graph_to_dataframe(graph):
+    dict_nodes_to_attributes = dict(graph.nodes.data(True))
+    df = pd.DataFrame.from_dict(dict_nodes_to_attributes, orient='index')
+
+    return df
+
+def create_dataframe_of_solutions_at_nodes(graph, y_results) -> pd.DataFrame:
+    df_nodes = convert_networkx_graph_to_dataframe(graph)
+    df_nodes = df_nodes.reset_index().rename(columns={'index': 'n_node'})
+    df_nodes['y_result'] = df_nodes['n_node'].map(y_results)
+    df_nodes['cwl_result'] = df_nodes['y_result'] - df_nodes['DEM']
+
+    return df_nodes
+
+def convert_dataframe_to_geodataframe(dataframe: pd.DataFrame, name_of_x_column: str, name_of_y_column: str, projection='epsg:32748') -> geopandas.GeoDataFrame:
+    """Geodataframes by definition contain spatially explicit information.
+    For this function to work, there must be 2 columns is the input dataframe which hold
+    longitude and latitude values. The names of these columns are specified under
+    name_of_x_column and name_of_y_column.
+    Also, it is necessary to specify a projection (or coordinate reference system name). 
+    The rest of the columns of the dataframe pass directly to the geodataframe
+
+    Args:
+        dataframe (pd.DataFrame): dataframe with longitude and latitude values
+        name_of_x_column (str): name of the column in the dataframe that holds long values
+        name_of_y_column (str): name of the column in the dataframe that holds lat values
+        projection (str): the coordinate reference system to use. By default, 'epsg:32748'
+
+    Returns:
+        geopandas.GeoDataFrame: A geodataframe containing all the data from the input dataframe
+    """
+
+    projection = 'epsg:32748'
+    gdf = geopandas.GeoDataFrame(dataframe, geometry=geopandas.points_from_xy(
+        dataframe[name_of_x_column], dataframe[name_of_y_column]), crs=projection)
+
+    return gdf
