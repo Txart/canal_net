@@ -128,7 +128,7 @@ def choose_bottom(graph_name, n_nodes):
 
     else:
         # default downward slope
-        bottom = np.linspace(start=4, stop=1,  num=n_nodes)
+        bottom = np.linspace(start=5, stop=3,  num=n_nodes)
 
     return bottom
 
@@ -442,3 +442,7 @@ def convert_dataframe_to_geodataframe(dataframe: pd.DataFrame, name_of_x_column:
         dataframe[name_of_x_column], dataframe[name_of_y_column]), crs=projection)
 
     return gdf
+
+def subtract_dictionary_values(d1, d2):
+    # d1 - d2. Loops over d1's keys.
+    return {key: d1[key] - d2.get(key, 0) for key in d1}

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from numba import njit, jit
 import scipy.sparse.linalg
 import scipy.linalg
@@ -302,28 +303,28 @@ def remove_equations_from_F(F_u, eqs_to_remove):
     return F_u
 
 
-def build_jacobian(y, y_previous, Q, Q_previous, B, general_params, channel_network_params):
+def build_jacobian(y, y_previous, Q, Q_previous, B, general_params, channel_network):
     dt = general_params.dt
     dx = general_params.dx
     a = general_params.a
     g = general_params.g
-    n_manning = general_params.n_manning
-    cnm = channel_network_params.cnm.toarray().astype('float64')
-    junctions = channel_network_params.junctions
-    upstream_nodes = channel_network_params.upstream_nodes
-    downstream_nodes = channel_network_params.downstream_nodes
-    block_nodes = channel_network_params.block_nodes
-    block_heights = channel_network_params.block_heights
-    k = channel_network_params.block_coeff_k
+    n_manning = channel_network.n_manning
+    cnm = channel_network.cnm.toarray().astype('float64')
+    junctions = channel_network.junctions
+    upstream_nodes = channel_network.upstream_nodes
+    downstream_nodes = channel_network.downstream_nodes
+    block_nodes = channel_network.block_nodes
+    block_heights = channel_network.block_heights
+    k = channel_network.block_coeff_k
 
     jacobian = build_cunge_general_jacobian(
         y, y_previous, Q, Q_previous, B, a, g, cnm, dt, dx, n_manning)
     jacobian = remove_equations_from_J(
-        jacobian, channel_network_params.pos_eqs_to_remove)
+        jacobian, channel_network.pos_eqs_to_remove)
     jacobian = fix_cunge_junctions_in_J(junctions, np.array(
-        channel_network_params.pos_of_junction_eqs_to_add), jacobian)
+        channel_network.pos_of_junction_eqs_to_add), jacobian)
     jacobian = fix_BC_in_J(jacobian, np.array(
-        channel_network_params.pos_of_BC_eqs_to_add), upstream_nodes, downstream_nodes)
+        channel_network.pos_of_BC_eqs_to_add), upstream_nodes, downstream_nodes)
 
     if len(block_nodes) != 0:
         jacobian = fix_cunge_block_BC_in_J(
@@ -332,28 +333,28 @@ def build_jacobian(y, y_previous, Q, Q_previous, B, general_params, channel_netw
     return jacobian
 
 
-def build_F(y, y_previous, Q, Q_previous, q, q_previous, B, general_params, channel_network_params):
+def build_F(y, y_previous, Q, Q_previous, q, q_previous, B, general_params, channel_network):
     dt = general_params.dt
     dx = general_params.dx
     a = general_params.a
     g = general_params.g
-    n_manning = general_params.n_manning
-    cnm = channel_network_params.cnm.toarray().astype('float64')
-    junctions = channel_network_params.junctions
-    block_nodes = channel_network_params.block_nodes
-    block_heights = channel_network_params.block_heights
-    k = channel_network_params.block_coeff_k
+    n_manning = channel_network.n_manning
+    cnm = channel_network.cnm.toarray().astype('float64')
+    junctions = channel_network.junctions
+    block_nodes = channel_network.block_nodes
+    block_heights = channel_network.block_heights
+    k = channel_network.block_coeff_k
 
     F_u = build_general_cunge_F(
         y, y_previous, Q, Q_previous, q, q_previous, B, a, g, cnm, dt, dx, n_manning)
     F_u = remove_equations_from_F(
-        F_u, channel_network_params.pos_eqs_to_remove)
+        F_u, channel_network.pos_eqs_to_remove)
     F_u = fix_cunge_junctions_in_F(
-        junctions, channel_network_params.pos_of_junction_eqs_to_add, F_u, y, Q)
+        junctions, channel_network.pos_of_junction_eqs_to_add, F_u, y, Q)
     F_u = fix_BC_in_F(F_u)
     if len(block_nodes) != 0:
         F_u = fix_cunge_block_BC_in_F(
-            F_u, y, Q, g, block_nodes, block_heights, k)
+            F_u, y, Q, g, np.array(block_nodes), np.array(block_heights), k)
 
     return F_u
 
@@ -410,29 +411,29 @@ def build_general_term_SS_jacobian(y, Q, B,  g, cnm, dx, n_manning):
     return jacobian
 
 
-def build_SS_jacobian(y, Q, B, general_params, channel_network_params):
-    cnm = channel_network_params.cnm
+def build_SS_jacobian(y, Q, B, general_params, channel_network):
+    cnm = channel_network.cnm.toarray().astype('float64')
     dx = general_params.dx
     g = general_params.g
-    n_manning = general_params.n_manning
-    junctions = channel_network_params.junctions
-    upstream_nodes = channel_network_params.upstream_nodes
-    downstream_nodes = channel_network_params.downstream_nodes
-    block_nodes = channel_network_params.block_nodes
-    block_heights = channel_network_params.block_heights
-    k = channel_network_params.block_coeff_k
+    n_manning = channel_network.n_manning
+    junctions = channel_network.junctions
+    upstream_nodes = channel_network.upstream_nodes
+    downstream_nodes = channel_network.downstream_nodes
+    block_nodes = channel_network.block_nodes
+    block_heights = channel_network.block_heights
+    k = channel_network.block_coeff_k
 
     jacobian = build_general_term_SS_jacobian(y, Q, B,  g, cnm, dx, n_manning)
     jacobian = remove_equations_from_J(
-        jacobian, channel_network_params.pos_eqs_to_remove)
+        jacobian, channel_network.pos_eqs_to_remove)
     jacobian = fix_cunge_junctions_in_J(junctions, np.array(
-        channel_network_params.pos_of_junction_eqs_to_add), jacobian)
+        channel_network.pos_of_junction_eqs_to_add), jacobian)
     jacobian = fix_BC_in_J(jacobian, np.array(
-        channel_network_params.pos_of_BC_eqs_to_add), upstream_nodes, downstream_nodes)
+        channel_network.pos_of_BC_eqs_to_add), upstream_nodes, downstream_nodes)
 
     if len(block_nodes) != 0:
         jacobian = fix_cunge_block_BC_in_J(
-            jacobian, y, g, block_nodes, block_heights, k)
+            jacobian, y, g, np.array(block_nodes), np.array(block_heights), k)
 
     return jacobian
 
@@ -455,30 +456,30 @@ def build_general_term_SS_F(y, Q, q, B, g, cnm, dx, n_manning):
     return F_u
 
 
-def build_SS_F(y, Q, q, B, general_params, channel_network_params):
-    cnm = channel_network_params.cnm
+def build_SS_F(y, Q, q, B, general_params, channel_network):
+    cnm = channel_network.cnm.toarray().astype('float64')
     dx = general_params.dx
     g = general_params.g
-    n_manning = general_params.n_manning
-    junctions = channel_network_params.junctions
-    block_nodes = channel_network_params.block_nodes
-    block_heights = channel_network_params.block_heights
-    k = channel_network_params.block_coeff_k
+    n_manning = channel_network.n_manning
+    junctions = channel_network.junctions
+    block_nodes = channel_network.block_nodes
+    block_heights = channel_network.block_heights
+    k = channel_network.block_coeff_k
 
     F_u = build_general_term_SS_F(y, Q, q, B, g, cnm, dx, n_manning)
     F_u = remove_equations_from_F(
-        F_u, channel_network_params.pos_eqs_to_remove)
+        F_u, channel_network.pos_eqs_to_remove)
     F_u = fix_cunge_junctions_in_F(
-        junctions, channel_network_params.pos_of_junction_eqs_to_add, F_u, y, Q)
+        junctions, channel_network.pos_of_junction_eqs_to_add, F_u, y, Q)
     F_u = fix_BC_in_F(F_u)
     if len(block_nodes) != 0:
         F_u = fix_cunge_block_BC_in_F(
-            F_u, y, Q, g, block_nodes, block_heights, k)
+            F_u, y, Q, g, np.array(block_nodes), np.array(block_heights), k)
 
     return F_u
 
 
-def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, general_params, channel_network_params, verbose=False):
+def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, general_params, channel_network, verbose=False):
 
     inexact_iter_counter = 0
     compute_and_factorize_jacobian = True
@@ -488,7 +489,7 @@ def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, 
 
         if compute_and_factorize_jacobian:
             jacobian = build_jacobian(
-                y, y_previous, Q, Q_previous, B, general_params, channel_network_params)
+                y, y_previous, Q, Q_previous, B, general_params, channel_network)
             if np.any(~np.any(jacobian, axis=1)):
                 raise ValueError(
                     ' The jacobian has at least one row of all zeroes!')
@@ -503,7 +504,7 @@ def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, 
             inexact_iter_counter = 0
 
         F_u = build_F(
-            y, y_previous, Q, Q_previous, q, q_previous, B, general_params, channel_network_params)
+            y, y_previous, Q, Q_previous, q, q_previous, B, general_params, channel_network)
 
         #x = scipy.linalg.lu_solve((LU, piv), -F_u)
         x = LU.solve(-F_u)
@@ -533,61 +534,23 @@ def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, 
     return y, Q
 
 
-def simulate_one_component(general_params, g_com):
-    # nodelist forces the adjacency matrix to have an order.
-    nodelist = list(g_com.nodes)
-    # 'float64' is required by Numba; transpose is needed by difference with NetworkX
-    cnm = nx.adjacency_matrix(g_com).T
-
-    dem = nx.get_node_attributes(g_com, 'DEM')
-
-    block_nodes = np.array([])
-    block_heights_from_ref_datum = np.array([])  # m from reference datum
-    # m from reference datum, NOT bottom elevation
-    block_heights = np.zeros(shape=block_heights_from_ref_datum.shape)
-    for i, node in enumerate(block_nodes):
-        block_heights[i] = block_heights_from_ref_datum[i]
-    block_coeff_k = 0.15
-
+def simulate_one_component(general_params, channel_network):
     cuthill_mckee_permutation = False
     if cuthill_mckee_permutation:
-        rcm = SSC.reverse_cuthill_mckee(scipy.sparse.csc_matrix(cnm))
+        rcm = SSC.reverse_cuthill_mckee(scipy.sparse.csc_matrix(channel_network.cnm))
         reverse_permutation = np.argsort(rcm)
-        cnm = utilities.permute_row_columns(rcm, cnm)
+        cnm = utilities.permute_row_columns(rcm, channel_network.cnm)
 
-    channel_network_params = classes.ChannelNetworkParameters(
-        cnm, block_nodes, block_heights, block_coeff_k)
-
-    # (rectangular) canal width in m
-    B = 7 * np.ones(channel_network_params.n_nodes)
-    # height of the channel bottom above common reference datum, i.e., same datum as DEM.
-    # bottom = np.zeros(shape=channel_network_params.n_nodes)
-
-    # Boundary Conditions
-    Q_upstream = 0.1
-    y_downstream_equal_to_y_ini = True # control if the BC condition on Y is the same as the initial condition or not.
-    if not y_downstream_equal_to_y_ini:
-        Y_downstream = 5.0
-
+    B = channel_network.B
+        
     # Initial conditions
-    # Y_ini = np.ones(n_nodes) * (1 + max(bottom))  # m above common reference. Horizontal water
-    Y_ini = np.array([dem[n] - 0.4 for n in nodelist])
+    Y_ini = channel_network.y
+    Q_ini = channel_network.Q
+    q = channel_network.q.copy()
+    
     if cuthill_mckee_permutation:
         Y_ini = utilities.permute_vector(rcm, Y_ini)
-
-    # Lateral inflow of water
-    q = 0.0 * np.ones(channel_network_params.n_nodes)
-    # q[upstream_bool] = 1
-    Q_ini = 0.01 * np.ones(channel_network_params.n_nodes)
-
-    Q_ini[np.array(channel_network_params.upstream_nodes)] = Q_upstream
-    if not y_downstream_equal_to_y_ini:
-        Y_ini[np.array(channel_network_params.downstream_nodes)] = Y_downstream
-
-    Q = Q_ini.copy()
-    Q_previous = Q_ini.copy()
-    y = Y_ini.copy()
-    y_previous = Y_ini.copy()
+        Q_ini = utilities.permute_vector(rcm, Q_ini)
 
     # NOTE: ONLY NEEDED IF INITIAL CONDITIONS SPECIFIED FROM STEADY STATE OR OTHERWISE (Not figured out yet)
     # if cuthill_mckee_permutation:
@@ -604,7 +567,7 @@ def simulate_one_component(general_params, g_com):
     # NOTE: WE HAVE TO TAKE NODE LABELLING INTO ACCOUNT! UNPACK THE CNMs WITH A CERTAIN NODELIST
     if SS:
         cnm_simple = SS_math_preissmann.simplify_graph_by_removing_junctions(
-            channel_network_params)
+            channel_network)
 
         g_simple = nx.DiGraph(incoming_graph_data=cnm_simple.T)
 
@@ -623,7 +586,8 @@ def simulate_one_component(general_params, g_com):
             branch_nodes = list(branch.nodes)
             if len(branch_nodes) > 2:  # Isolated nodes are removed from steady state computation
                 cnp_branch = classes.ChannelNetworkParameters(nx.adjacency_matrix(
-                    branch).toarray().T, np.array([]), np.array([]), block_coeff_k)
+                    branch).toarray().T, np.array([]), np.array([]), channel_network.block_coeff_k)
+                
                 y_branch, Q_branch = SS_math_preissmann.SS_computation(
                     y_guess[branch_nodes], Q_guess[branch_nodes], B[branch_nodes], q_guess[branch_nodes], general_params, cnp_branch)
 
@@ -639,28 +603,44 @@ def simulate_one_component(general_params, g_com):
     # In order to change this into exact Jacobian, just make sure
     # compute_and_factorize_jacobian is always set to True
 
-    y = Y_ini.copy()
     Q = Q_ini.copy()
+    Q_previous = Q_ini.copy()
+    y = Y_ini.copy()
+    y_previous = Y_ini.copy()
 
     for timestep in range(general_params.ntimesteps):
         y, Q = cunge_inexact_newtonRaphson(
-            y, y_previous, Q, Q_previous, q, q, B, general_params, channel_network_params)
+            y, y_previous, Q, Q_previous, q, q, B, general_params, channel_network)
         y_previous = y.copy()
         Q_previous = Q.copy()
 
     # Store reesults of last timestep simulation (the rest are not stored)
     if cuthill_mckee_permutation:
-        y_sol = utilities.permute_vector(reverse_permutation, y)
-        Q_sol = utilities.permute_vector(reverse_permutation, Q)
-    else:
-        y_sol = y
-        Q_sol = Q
+        y = utilities.permute_vector(reverse_permutation, y)
+        Q = utilities.permute_vector(reverse_permutation, Q)
 
-    nodes_y = dict()
-    nodes_Q = dict()
-    for ys, nodename in zip(y_sol, nodelist):
-        nodes_y[nodename] = ys
-    for Qs, nodename in zip(Q_sol, nodelist):
-        nodes_Q[nodename] = Qs
+    return y, Q
 
-    return nodes_y, nodes_Q
+def simulate_one_component_several_iter(NDAYS, channel_network, general_params):        
+    # create this comonent's solution dataframe
+    df_y = pd.DataFrame(index=channel_network.graph.nodes)
+    df_Q = pd.DataFrame(index=channel_network.graph.nodes)
+    # store initial values
+    df_y[0] = pd.Series(channel_network.y)
+    df_Q[0] = pd.Series(channel_network.Q)
+    df_y['DEM'] = pd.Series(channel_network.dem)
+
+    for nday in range(1, NDAYS+1):
+        # Simulate
+        ysol, Qsol =simulate_one_component(
+            general_params, channel_network)
+
+        # update next iteration's initial condition
+        channel_network.y = ysol
+        channel_network.Q = Qsol
+
+        # Append results
+        df_y[nday] = pd.Series(channel_network.from_nparray_to_nodedict(ysol))
+        df_Q[nday] = pd.Series(channel_network.from_nparray_to_nodedict(Qsol))
+
+    return df_y, df_Q

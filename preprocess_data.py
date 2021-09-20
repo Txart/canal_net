@@ -580,3 +580,7 @@ def load_graph(load_from_pickled=True):
         graph = compute_channel_network_graph(gpkg_fn, fn_dtm10x10)
 
     return graph
+
+# %%
+
+# %%

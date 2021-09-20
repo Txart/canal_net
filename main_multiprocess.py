@@ -1,6 +1,8 @@
 # %% imports
 import multiprocessing as mp
 from tqdm import tqdm
+import pandas as pd
+import pickle
 
 import utilities
 import math_preissmann
@@ -32,26 +34,65 @@ def export_cwl_solution_to_geojson(results, graph, general_params):
 
     col_to_export = 'cwl_result'
     gdf_to_export = gdf[[col_to_export, 'geometry']]
-    filename = r"C:\Users\03125327\github\canal_net\output\cwl_mp_n={n}_ntimesteps={}.geojson".format(n=general_params.n_manning, n_timesteps=general_params.ntimesteps)
+    filename = r"C:\Users\03125327\github\canal_net\output\cwl_mp_n={n}_ntimesteps={ntimesteps}.geojson".format(n=physical_params.n_manning, ntimesteps=general_params.ntimesteps)
     # gdf_to_export.to_file(r"C:\Users\03125327\github\canal_networks\output\cwl_geopackage.gpkg", driver="GPKG") # This is not working and it's annoying! Seems to be a Windows problem.
     gdf_to_export.to_file(filename, driver='GeoJSON')
 
     return 0
 
+def simulate_one_component_several_iter(NDAYS, g_com, general_params, physical_params):
+    # channel network description
+    block_nodes = []  # numbers refer to node names
+    block_heights_from_surface = []  # m from DEM surface
+    block_coeff_k = 2.0
+    channel_network = classes.ChannelNetwork(
+        g_com, block_nodes, block_heights_from_surface, block_coeff_k, y_ini_below_DEM=0.4, Q_ini_value=0.0, q_value=5*1e-3)
+    # create this comonent's solution dataframe
+    df_y = pd.DataFrame(index=g_com.nodes)
+    df_Q = pd.DataFrame(index=g_com.nodes)
+    # store initial values
+    df_y[0] = pd.Series(channel_network.y)
+    df_Q[0] = pd.Series(channel_network.Q)
+    df_y['DEM'] = pd.Series(channel_network.dem)
+
+    for nday in range(1, NDAYS+1):
+        # Simulate
+        ysol, Qsol = math_preissmann.simulate_one_component(
+            general_params, physical_params, channel_network)
+
+        # update next iteration's initial condition
+        channel_network.y = ysol
+        channel_network.Q = Qsol
+
+        # Append results
+        df_y[nday] = pd.Series(ysol)
+        df_Q[nday] = pd.Series(Qsol)
+
+    return df_y, df_Q
+
 
 if __name__ == '__main__':
-    n_processes = 6
-    y_results = {}
-    Q_results = {}
+    N_CPUS = 6
+    NDAYS = 5
+    
     graph = preprocess_data.load_graph(load_from_pickled=True)
+    
+    # solution variables
+    df_y = pd.DataFrame(index=graph.nodes)
+    df_Q = pd.DataFrame(index=graph.nodes)    
+    
     component_graphs = utilities.find_graph_components(graph)
     # Physics and numerics
-    general_params = classes.GlobalParameters(g=9.8, dt=3600, dx=10, a=0.6, n_manning=0.3,
-                                              max_niter_newton=int(1e5), max_niter_inexact=int(1e3), ntimesteps=5, rel_tol=1e-5, abs_tol=1e-5, weight_A=1e-3, weight_Q=1e-3)
+    general_params = classes.GlobalParameters(g=9.8, dt=3600, dx=50, a=0.6,
+                            max_niter_newton=int(1e5), max_niter_inexact=int(1e3), ntimesteps=1,
+                            rel_tol=1e-5, abs_tol=1e-5, weight_A=1e-2, weight_Q=1e-2)
+    physical_params = classes.PhysicalParameters(
+                        n_manning=0.15, y_BC_below_DEM=0.0, Q_BC=0.0, channel_width=3)
+    with mp.Pool(processes=N_CPUS) as pool:
+        results = pool.starmap(simulate_one_component_several_iter, tqdm(
+            [(NDAYS, g_com, general_params, physical_params) for g_com in component_graphs]))
 
-    with mp.Pool(processes=n_processes) as pool:
-        results = pool.starmap(math_preissmann.simulate_one_component, tqdm(
-            [(general_params, g_com) for g_com in component_graphs]))
+    pickle.dump(results, 'res.p')
 
     # export solution
-    export_cwl_solution_to_geojson(results, graph, general_params)
+    #export_cwl_solution_to_geojson(results, graph, general_params)

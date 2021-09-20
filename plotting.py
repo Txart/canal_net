@@ -6,11 +6,11 @@ import numpy as np
 # %%
 
 
-def plot_water_height(x, Y, bottom):
+def plot_water_height(x, Y, bottom, title):
     plt.figure()
     plt.fill_between(x, y1=bottom, y2=0, color='brown', alpha=0.5)
     plt.fill_between(x, y1=bottom + Y, y2=bottom, color='blue', alpha=0.5)
-    plt.title('Initial water height and DEM')
+    plt.title(title)
 
 
 def plot_velocity(x, V):

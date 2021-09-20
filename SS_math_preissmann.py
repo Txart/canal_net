@@ -28,13 +28,15 @@ def simplify_graph_by_removing_junctions(channel_network_params):
     return cnm_simple
 
 
-def SS_computation(y, Q, B, q, general_params, channel_network_params):
+def SS_computation(channel_network, general_params):
+    y = channel_network.y
+    Q = channel_network.Q
+    B = channel_network.B
+    q = channel_network.q
     for i in range(general_params.max_niter_newton):
-
-        jacoSS = math_preissmann.build_SS_jacobian(
-            y, Q, B, general_params, channel_network_params)
-        FuSS = math_preissmann.build_SS_F(
-            y, Q, q, B, general_params, channel_network_params)
+        print(i)
+        jacoSS = math_preissmann.build_SS_jacobian(y, Q, B, general_params, channel_network)
+        FuSS = math_preissmann.build_SS_F(y, Q, q, B, general_params, channel_network)
 
         x = scipy.linalg.solve(jacoSS, -FuSS)
 
@@ -49,7 +51,7 @@ def SS_computation(y, Q, B, q, general_params, channel_network_params):
 
         if np.any(np.isnan(y) | np.isnan(Q)):
             print(
-                '\n>>> y: ', y, ' x_y: ', x_y, ' \n>>> y_previous: ', y_previous, ' \n >>> Q: ', Q, ' x_Q: ', x_Q, ' \n>>> Q_previous: ', Q)
+                '\n>>> y: ', y, ' x_y: ', x_y, ' \n >>> Q: ',Q, ' x_Q: ', x_Q,)
             raise ValueError('Nan at some point of Inexact Newton-Raphson')
 
-    return y, Q
+    returny,Q
