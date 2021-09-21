@@ -76,10 +76,12 @@ for n in range(n_nodes):
 NDAYS = 10
 general_params = classes.GlobalParameters(g=9.8, dt=3600, dx=50, a=0.6,
                                           max_niter_newton=int(1e5), max_niter_inexact=int(1e3), ntimesteps=24,
-                                          rel_tol=1e-5, abs_tol=1e-5, weight_A=1e-3, weight_Q=1e-3)
+                                          rel_tol=1e-5, abs_tol=1e-5, weight_A=1e-2, weight_Q=1e-2)
 
 df_y = pd.DataFrame(index=graph.nodes)
 df_Q = pd.DataFrame(index=graph.nodes)
+
+N_MANNING = 0.05
 
 # channel network description
 block_nodes = []  # numbers refer to node names
@@ -87,7 +89,7 @@ block_heights_from_surface = []  # m from DEM surface
 channel_network = classes.ChannelNetwork(
                 graph, block_nodes, block_heights_from_surface, block_coeff_k=2.0,
                 y_ini_below_DEM=0.4, Q_ini_value=0.0, 
-                n_manning=0.05, y_BC_below_DEM=0.0, Q_BC=0.0, channel_width=5)
+                n_manning=N_MANNING, y_BC_below_DEM=0.0, Q_BC=0.0, channel_width=5)
 
 df_comp_y, df_comp_Q = math_preissmann.simulate_one_component_several_iter(NDAYS, channel_network, general_params)
 print('simulating...')
@@ -95,7 +97,7 @@ print('simulating...')
 df_y = pd.concat([df_y, df_comp_y])
 df_Q = pd.concat([df_Q, df_comp_Q])
 
-df_y.plot()
+df_y.plot(title=f'n_manning = {N_MANNING}')
 
 
 
@@ -178,6 +180,30 @@ pickle.dump(df_Q, open('df_Q.p', 'wb'))
 
 df_y = pickle.load(open('df_y.p', "rb"))
 df_Q = pickle.load(open('df_Q.p', "rb"))
-# Export to geoJSOn
 
-# %%
+# Remove rows that have all NaNs 
+df_y.dropna(how="all", inplace=True)
+# rename columns to strings
+df_y.rename(columns={i:str(i) for i in range(0,11)}, inplace=True)
+
+for node,attr in graph.nodes(data=True):
+    df_y.loc[node, 'x'] = attr['x']
+    df_y.loc[node, 'y'] = attr['y']
+    df_y.loc[node, '10'] = df_y.loc[node, '10'] - attr['DEM'] # Convert y of 10th day to cwl = dem - y
+    
+gdf = utilities.convert_dataframe_to_geodataframe(
+    df_y, 'x', 'y', 'epsg:32748')
+
+col_to_export = '10' # must be a string
+gdf_to_export = gdf[[col_to_export, 'geometry']]
+fn_out_cwl = r"C:\Users\03125327\github\canal_net\output\cwl_cali_n={}.geojson".format(n_manning)
+# gdf_to_export.to_file(r"C:\Users\03125327\github\canal_networks\output\cwl_geopackage.gpkg", driver="GPKG") # This is not working and it's annoying! Seems to be a Windows problem.
+gdf_to_export.to_file(fn_out_cwl, driver='GeoJSON')
+
+# %% Calibration of numerical params with real data
+# Fixed params: tolerances, max_niter_newton
+# parameters to fix: max_niter_inexact, weight_A, weight_Q
+
+import time
+
+compo_graphs = component_graphs

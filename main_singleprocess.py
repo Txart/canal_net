@@ -2,7 +2,7 @@
 import pandas as pd
 import sys
 from networkx.utils.rcm import cuthill_mckee_ordering
-import pypardiso
+#import pypardiso
 import scipy.sparse.csgraph as SSC
 import scipy.sparse.linalg as SPL
 from numpy.core.fromnumeric import shape
@@ -26,7 +26,7 @@ import math_preissmann
 import classes
 import preprocess_data
 # %%
-real_data = False
+real_data = True
 if real_data:
     graph = preprocess_data.load_graph(load_from_pickled=True)
     component_graphs = utilities.find_graph_components(graph)
@@ -60,7 +60,7 @@ for g_com in tqdm(component_graphs):
     block_heights_from_surface = []  # m from DEM surface
     channel_network = classes.ChannelNetwork(
                     g_com, block_nodes, block_heights_from_surface, block_coeff_k=2.0,
-                    y_ini_below_DEM=0.4, Q_ini_value=0.0, q=0.26/len(g_com.nodes()), 
+                    y_ini_below_DEM=0.4, Q_ini_value=0.0, 
                     n_manning=0.05, y_BC_below_DEM=0.0, Q_BC=0.0, channel_width=5)
     
     df_comp_y, df_comp_Q = math_preissmann.simulate_one_component_several_iter(NDAYS, channel_network, general_params)

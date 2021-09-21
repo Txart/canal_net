@@ -3,7 +3,7 @@ import pandas as pd
 from numba import njit, jit
 import scipy.sparse.linalg
 import scipy.linalg
-import pypardiso
+#import pypardiso
 import networkx as nx
 import scipy.sparse.csgraph as SSC
 from tqdm import tqdm

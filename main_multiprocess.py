@@ -11,12 +11,12 @@ import preprocess_data
 # %% Some funcs
 
 
-def multiprocessing_solution_to_dictionary_of_nodes(results):
+def multiprocessing_solution_to_dictionary_of_nodes(results, channel_networks):
     y_results = {}
     Q_results = {}
-    for result in results:
-        y_sol = result[0]
-        Q_sol = result[1]
+    for channel_network, result in zip(channel_networks,results):
+        y_sol = channel_network.from_nparray_to_nodedict(result[0])
+        Q_sol = channel_network.from_nparray_to_nodedict(result[1])
         y_results = utilities.merge_two_dictionaries(y_results, y_sol)
         Q_results = utilities.merge_two_dictionaries(Q_results, Q_sol)
     return y_results, Q_results
@@ -45,27 +45,26 @@ if __name__ == '__main__':
     N_CPUS = 6
     
     graph = pickle.load(open("canal_network_matrix_with_q.p", "rb")) # q in the grapgh nodes
-    # graph = preprocess_data.load_graph(load_from_pickled=True)
+    # graph = preprocess_data.load_graph(load_from_pickled=True) 
     
-    # solution variables
-    df_y = pd.DataFrame(index=graph.nodes)
-    df_Q = pd.DataFrame(index=graph.nodes)    
-    
-    component_graphs = utilities.find_graph_components(graph)[:10]
-    # Physics and numerics
+    component_graphs = utilities.find_graph_components(graph)
+
     general_params = classes.GlobalParameters(g=9.8, dt=3600, dx=50, a=0.6,
-                            max_niter_newton=int(1e5), max_niter_inexact=int(1e3), ntimesteps=1,
-                            rel_tol=1e-5, abs_tol=1e-5, weight_A=1e-2, weight_Q=1e-2)
+                            max_niter_newton=int(1e5), max_niter_inexact=int(1e3), ntimesteps=24,
+                            rel_tol=1e-5, abs_tol=1e-5, weight_A=1e-3, weight_Q=1e-3)
+    
+    # create a list of channel_network classes in order to be able to loop Pool.starmap through them
+    channel_networks = [classes.ChannelNetwork(
+                    g_com, block_nodes=[], block_heights_from_surface=[], block_coeff_k=2.0,
+                    y_ini_below_DEM=0.4, Q_ini_value=0.0,
+                    n_manning=0.05, y_BC_below_DEM=0.0, Q_BC=0.0, channel_width=5) for g_com in component_graphs]
+    
     
     with mp.Pool(processes=N_CPUS) as pool:
         results = pool.starmap(math_preissmann.simulate_one_component, tqdm(
-            [(general_params,
-              classes.ChannelNetwork(
-                    g_com, block_nodes=[], block_heights_from_surface=[], block_coeff_k=2.0,
-                    y_ini_below_DEM=0.4, Q_ini_value=0.0,
-                    n_manning=0.05, y_BC_below_DEM=0.0, Q_BC=0.0, channel_width=5)) for g_com in component_graphs]))
+            [(general_params, channel_network) for channel_network in channel_networks]))
 
-    pickle.dump(results, open('res.p', 'wb'))
+    #pickle.dump(results, open('res.p', 'wb'))
 
     # export solution
     #export_cwl_solution_to_geojson(results, graph, general_params)

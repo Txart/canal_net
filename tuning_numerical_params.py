@@ -39,9 +39,11 @@ def objective_function(weight_A, weight_Q):
     return -1.0 * time_spent(weight_A, weight_Q, channel_networks)
     
 # %% In parallel: https://scikit-optimize.github.io/stable/auto_examples/parallel-optimization.html#sphx-glr-auto-examples-parallel-optimization-py
+
 SPACE = [
     skopt.space.Real(0, 0.1, name='weight_y', prior='uniform'),
     skopt.space.Real(0, 0.1, name='weight_Q', prior='uniform')]
+
 
 optimizer = skopt.Optimizer(dimensions=SPACE)
 

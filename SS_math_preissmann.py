@@ -34,7 +34,6 @@ def SS_computation(channel_network, general_params):
     B = channel_network.B
     q = channel_network.q
     for i in range(general_params.max_niter_newton):
-        print(i)
         jacoSS = math_preissmann.build_SS_jacobian(y, Q, B, general_params, channel_network)
         FuSS = math_preissmann.build_SS_F(y, Q, q, B, general_params, channel_network)
 
