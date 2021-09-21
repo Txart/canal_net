@@ -5,10 +5,23 @@ import pickle
 import time
 import skopt
 import joblib
+import argparse
 
 import utilities
 import math_preissmann
 import classes
+
+#%% Parse command-line arguments
+
+parser = argparse.ArgumentParser(description='Tune model numerical parameters')
+
+parser.add_argument('--ncpu', default=4, help='(int) Number of cpus to use. Default:4', type=int)
+parser.add_argument('-n','--niter', default=10, help='(int) Number of iterations to run. Default:10', type=int)
+args = parser.parse_args()
+
+NCPU = args.ncpu
+NITER = args.niter
+
 
 #%% Bayesian tuning of numerical parameters with real data
 
@@ -47,12 +60,10 @@ SPACE = [
 
 optimizer = skopt.Optimizer(dimensions=SPACE)
 
-N_ITER = 10
-N_CPU = 6
-for i in range(N_ITER):
+for i in range(NITER):
     print(i)
-    x = optimizer.ask(n_points=N_CPU)
-    y = joblib.Parallel(n_jobs=N_CPU)(joblib.delayed(objective_function)(*v) for v in x)
+    x = optimizer.ask(n_points=NCPU)
+    y = joblib.Parallel(n_jobs=NCPU)(joblib.delayed(objective_function)(*v) for v in x)
     optimizer.tell(x,y)
     
 
