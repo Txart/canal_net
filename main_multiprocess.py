@@ -40,59 +40,34 @@ def export_cwl_solution_to_geojson(results, graph, general_params):
 
     return 0
 
-def simulate_one_component_several_iter(NDAYS, g_com, general_params, physical_params):
-    # channel network description
-    block_nodes = []  # numbers refer to node names
-    block_heights_from_surface = []  # m from DEM surface
-    block_coeff_k = 2.0
-    channel_network = classes.ChannelNetwork(
-        g_com, block_nodes, block_heights_from_surface, block_coeff_k, y_ini_below_DEM=0.4, Q_ini_value=0.0, q_value=5*1e-3)
-    # create this comonent's solution dataframe
-    df_y = pd.DataFrame(index=g_com.nodes)
-    df_Q = pd.DataFrame(index=g_com.nodes)
-    # store initial values
-    df_y[0] = pd.Series(channel_network.y)
-    df_Q[0] = pd.Series(channel_network.Q)
-    df_y['DEM'] = pd.Series(channel_network.dem)
-
-    for nday in range(1, NDAYS+1):
-        # Simulate
-        ysol, Qsol = math_preissmann.simulate_one_component(
-            general_params, physical_params, channel_network)
-
-        # update next iteration's initial condition
-        channel_network.y = ysol
-        channel_network.Q = Qsol
-
-        # Append results
-        df_y[nday] = pd.Series(ysol)
-        df_Q[nday] = pd.Series(Qsol)
-
-    return df_y, df_Q
-
 
 if __name__ == '__main__':
     N_CPUS = 6
-    NDAYS = 5
     
-    graph = preprocess_data.load_graph(load_from_pickled=True)
+    graph = pickle.load(open("canal_network_matrix_with_q.p", "rb")) # q in the grapgh nodes
+    # graph = preprocess_data.load_graph(load_from_pickled=True)
     
     # solution variables
     df_y = pd.DataFrame(index=graph.nodes)
     df_Q = pd.DataFrame(index=graph.nodes)    
     
-    component_graphs = utilities.find_graph_components(graph)
+    component_graphs = utilities.find_graph_components(graph)[:10]
     # Physics and numerics
     general_params = classes.GlobalParameters(g=9.8, dt=3600, dx=50, a=0.6,
                             max_niter_newton=int(1e5), max_niter_inexact=int(1e3), ntimesteps=1,
                             rel_tol=1e-5, abs_tol=1e-5, weight_A=1e-2, weight_Q=1e-2)
-    physical_params = classes.PhysicalParameters(
-                        n_manning=0.15, y_BC_below_DEM=0.0, Q_BC=0.0, channel_width=3)
+    
     with mp.Pool(processes=N_CPUS) as pool:
-        results = pool.starmap(simulate_one_component_several_iter, tqdm(
-            [(NDAYS, g_com, general_params, physical_params) for g_com in component_graphs]))
+        results = pool.starmap(math_preissmann.simulate_one_component, tqdm(
+            [(general_params,
+              classes.ChannelNetwork(
+                    g_com, block_nodes=[], block_heights_from_surface=[], block_coeff_k=2.0,
+                    y_ini_below_DEM=0.4, Q_ini_value=0.0,
+                    n_manning=0.05, y_BC_below_DEM=0.0, Q_BC=0.0, channel_width=5)) for g_com in component_graphs]))
 
-    pickle.dump(results, 'res.p')
+    pickle.dump(results, open('res.p', 'wb'))
 
     # export solution
     #export_cwl_solution_to_geojson(results, graph, general_params)
+
+# %%
