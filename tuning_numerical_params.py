@@ -1,72 +1,74 @@
 # %% imports
 from tqdm import tqdm
-import pandas as pd
+import numpy as np
 import pickle
 import time
-import skopt
-import joblib
-import argparse
+import multiprocessing as mp
+import os
 
 import utilities
 import math_preissmann
 import classes
 
-#%% Parse command-line arguments
-
-parser = argparse.ArgumentParser(description='Tune model numerical parameters')
-
-parser.add_argument('--ncpu', default=4, help='(int) Number of cpus to use. Default:4', type=int)
-parser.add_argument('-n','--niter', default=10, help='(int) Number of iterations to run. Default:10', type=int)
-args = parser.parse_args()
-
-NCPU = args.ncpu
-NITER = args.niter
-
-
 #%% Bayesian tuning of numerical parameters with real data
 
-graph = pickle.load(open("canal_network_matrix_with_q.p", "rb")) # q in the grapgh nodes
-component_graphs = utilities.find_graph_components(graph)[100:110] # Take 10 medium sized components
 
-def time_spent(weight_A, weight_Q, channel_networks):
-    try:
-        start_time = time.time()
-        general_params = classes.GlobalParameters(g=9.8, dt=3600, dx=50, a=0.6,
-                                            max_niter_newton=int(1e5), max_niter_inexact=int(1e3), ntimesteps=24,
-                                            rel_tol=1e-5, abs_tol=1e-5, weight_A=weight_A, weight_Q=weight_Q)
 
-        for channel_network in channel_networks:
-            _ = math_preissmann.simulate_one_component(general_params, channel_network)
+def time_spent(weights, ntimesteps, channel_networks):
+    start_time = time.time()
+    general_params = classes.GlobalParameters(g=9.8, dt=int(86400/ntimesteps), dx=50, a=0.6,
+                                        max_niter_newton=int(1e5), max_niter_inexact=int(1e3), ntimesteps=ntimesteps,
+                                        rel_tol=1e-5, abs_tol=1e-5, weight_A=weights, weight_Q=weights)
 
-        return time.time() - start_time
-    
-    except: # solver crashed with some params
-        return 10e8
+    with mp.Pool(processes=NCPU) as pool:
+        _ = pool.starmap(math_preissmann.simulate_one_component, tqdm(
+            [(general_params, channel_network) for channel_network in channel_networks]))
 
-def objective_function(weight_A, weight_Q):
+    return time.time() - start_time
+
+def objective_function(weights,ntimesteps):
     channel_networks = [classes.ChannelNetwork(
                     g_com, block_nodes=[], block_heights_from_surface=[], block_coeff_k=2.0,
                     y_ini_below_DEM=0.4, Q_ini_value=0.0, 
                     n_manning=0.05, y_BC_below_DEM=0.0, Q_BC=0.0, channel_width=5) for g_com in component_graphs]
 
-    return -1.0 * time_spent(weight_A, weight_Q, channel_networks)
+    return time_spent(weights, ntimesteps, channel_networks)
     
-# %% In parallel: https://scikit-optimize.github.io/stable/auto_examples/parallel-optimization.html#sphx-glr-auto-examples-parallel-optimization-py
+# %% Tuning in parallel
+# I want to obtain the best numerical parameters that compute the simulation without crashing
+# I know 2 things:
+# 1. the bigger dt, the less iterations, which implies less time
+# 2. the larger the weights of Newton-Raphson method, the less time
+# The solver works for dt=3600 and weights=1e-3. Can we improve this?
+# I do an exhaustive grid search with different dts and weights
+# Instead of using dt directly, I use ntimesteps (number of chunks in which a day is divided):
+# ntimesteps is directly related to dt, because total simulation time is 1day. So dt=int(86400/ntimesteps)
 
-SPACE = [
-    skopt.space.Real(0, 0.1, name='weight_y', prior='uniform'),
-    skopt.space.Real(0, 0.1, name='weight_Q', prior='uniform')]
 
+if __name__ == '__main__':
 
-optimizer = skopt.Optimizer(dimensions=SPACE)
-
-for i in range(NITER):
-    print(i)
-    x = optimizer.ask(n_points=NCPU)
-    y = joblib.Parallel(n_jobs=NCPU)(joblib.delayed(objective_function)(*v) for v in x)
-    optimizer.tell(x,y)
+    NCPU = os.cpu_count()
     
+    n_components_to_compute = int(NCPU*2)
+    
+    graph = pickle.load(open("canal_network_matrix_with_q.p", "rb")) # q in the grapgh nodes
+    component_graphs = utilities.find_graph_components(graph)[:n_components_to_compute] # Take the largest components
+    
+    NTIMESTEPS_RANGE  = np.arange(start=2, stop=24, step=2)[::-1]
+    WEIGHTS_RANGE = [10**(i) for i in np.linspace(start=-3, stop=-1, num=20)]
+    
+    results = {}
+    
+    for ntimesteps in tqdm(NTIMESTEPS_RANGE):
+        for weights in WEIGHTS_RANGE:
+            try:
+                timespent = objective_function(weights, ntimesteps)
+                results[(ntimesteps, weights)] = timespent
+            except: # the computation crashed and it is not expected to improve by additional refinement of parameters
+                break
+    
+    pickle.dump(results, open('tuning_res.p', 'wb'))
 
-# %% Print results
-# optimizer.Xi # list of params used
-print(min(optimizer.yi))
+
+
+# %%
