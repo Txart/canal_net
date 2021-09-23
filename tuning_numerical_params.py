@@ -5,6 +5,7 @@ import pickle
 import time
 import multiprocessing as mp
 import os
+import pandas as pd
 
 import utilities
 import math_preissmann
@@ -47,7 +48,7 @@ def objective_function(weights,ntimesteps):
 
 if __name__ == '__main__':
 
-    NCPU = os.cpu_count()
+    NCPU = os.cpu_count() - 4
     
     n_components_to_compute = int(NCPU*2)
     
@@ -56,7 +57,7 @@ if __name__ == '__main__':
     
     NTIMESTEPS_RANGE  = np.arange(start=2, stop=24, step=2)[::-1]
     WEIGHTS_RANGE = [10**(i) for i in np.linspace(start=-3, stop=-1, num=20)]
-    
+
     results = {}
     
     for ntimesteps in tqdm(NTIMESTEPS_RANGE):
@@ -69,6 +70,18 @@ if __name__ == '__main__':
     
     pickle.dump(results, open('tuning_res.p', 'wb'))
 
+# %% Postprocess above calcs. Comment out if running the parameter calibration from above.
 
+""" results = pickle.load(open('tuning_res.p', 'rb'))
+df = pd.DataFrame()
 
+for key, value in results.items():
+    df.loc[key[0],key[1]] = value
+    
+# Write to markdown
+with open('df_tuning_results.md', 'w') as f: 
+    f.write(df.to_markdown())
+
+import seaborn as sns
+sns.heatmap(df) """
 # %%

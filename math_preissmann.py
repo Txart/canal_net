@@ -479,10 +479,11 @@ def build_SS_F(y, Q, q, B, general_params, channel_network):
     return F_u
 
 
-def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, general_params, channel_network, verbose=False):
+def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, general_params, channel_network, verbose=False, do_force_convergence=True):
 
     inexact_iter_counter = 0
     compute_and_factorize_jacobian = True
+    has_converged = False
 
     for i in range(general_params.max_niter_newton):
         norm_of_the_previous_solution = np.inf
@@ -524,12 +525,17 @@ def cunge_inexact_newtonRaphson(y, y_previous, Q, Q_previous, q, q_previous, B, 
 
         if np.linalg.norm(x) < general_params.rel_tol*np.linalg.norm(utilities.interweave_vectors(y_previous, Q_previous)) + general_params.abs_tol:
             if verbose:
+                has_converged = True
                 print('\n>>> Inexact Newton-Rhapson converged after ', i, ' iterations')
             return y, Q
         elif np.any(np.isnan(y) | np.isnan(Q)):
             print(
                 '\n>>> y: ', y, ' x_y: ', x_y, ' \n>>> y_previous: ', y_previous, ' \n >>> Q: ', Q, ' x_Q: ', x_Q, ' \n>>> Q_previous: ', Q)
             raise ValueError('Nan at some point of Inexact Newton-Raphson')
+
+    if do_force_convergence and not has_converged:
+        raise ValueError('The Inexact Newton-Raphson method did not converge in the given iterations, \n and the enforcer do_force_convergence was set to True (it is True by default')
+        
 
     return y, Q
 
@@ -551,53 +557,6 @@ def simulate_one_component(general_params, channel_network):
     if cuthill_mckee_permutation:
         Y_ini = utilities.permute_vector(rcm, Y_ini)
         Q_ini = utilities.permute_vector(rcm, Q_ini)
-
-    # NOTE: ONLY NEEDED IF INITIAL CONDITIONS SPECIFIED FROM STEADY STATE OR OTHERWISE (Not figured out yet)
-    # if cuthill_mckee_permutation:
-    #     y = utilities.permute_vector(rcm, y)
-    #     y_previous = utilities.permute_vector(rcm, y_previous)
-    #     Q = utilities.permute_vector(rcm, Q)
-    #     Q_previous = utilities.permute_vector(rcm, Q_previous)
-    #     B = utilities.permute_vector(rcm, B)
-    #     q = utilities.permute_vector(rcm, q)
-    #     q_previous = utilities.permute_vector(rcm, q)
-
-    # Steady state for initial conditions
-    SS = False
-    # NOTE: WE HAVE TO TAKE NODE LABELLING INTO ACCOUNT! UNPACK THE CNMs WITH A CERTAIN NODELIST
-    if SS:
-        cnm_simple = SS_math_preissmann.simplify_graph_by_removing_junctions(
-            channel_network)
-
-        g_simple = nx.DiGraph(incoming_graph_data=cnm_simple.T)
-
-        branches = [g_simple.subgraph(c).copy() for c in sorted(
-            nx.weakly_connected_components(g_simple), key=len, reverse=True)]
-        length_branches = [len(c) for c in sorted(
-            nx.weakly_connected_components(g_simple), key=len, reverse=True)]
-        print(
-            f'There are {length_branches.count(1)} isolated branches as a result of the junction prunning')
-
-        y_guess = Y_ini.copy()  # Initial guesses for Steady state computation
-        Q_guess = Q_ini.copy()
-        q_guess = q.copy()
-
-        for branch in tqdm(branches):
-            branch_nodes = list(branch.nodes)
-            if len(branch_nodes) > 2:  # Isolated nodes are removed from steady state computation
-                cnp_branch = classes.ChannelNetworkParameters(nx.adjacency_matrix(
-                    branch).toarray().T, np.array([]), np.array([]), channel_network.block_coeff_k)
-                
-                y_branch, Q_branch = SS_math_preissmann.SS_computation(
-                    y_guess[branch_nodes], Q_guess[branch_nodes], B[branch_nodes], q_guess[branch_nodes], general_params, cnp_branch)
-
-                # update Y_guess
-                y_guess[branch_nodes] = y_branch
-                Q_guess[branch_nodes] = Q_branch
-
-        # Initial condition for the unsteady flow computation
-        Y_ini = y_guess
-        Q_ini = Q_guess
 
     # Inexact Cunge Jacobian solution
     # In order to change this into exact Jacobian, just make sure
@@ -644,3 +603,43 @@ def simulate_one_component_several_iter(NDAYS, channel_network, general_params):
         df_Q[nday] = pd.Series(channel_network.from_nparray_to_nodedict(Qsol))
 
     return df_y, df_Q
+
+def simulate_one_component_SS(general_params, channel_network):
+    
+    B = channel_network.B
+        
+    # Initial conditions
+    Y_ini = channel_network.y
+    Q_ini = channel_network.Q
+    q = channel_network.q.copy()
+    
+    cnm_simple = SS_math_preissmann.simplify_graph_by_removing_junctions(
+        channel_network)
+
+    g_simple = nx.DiGraph(incoming_graph_data=cnm_simple.T)
+
+    branches = [g_simple.subgraph(c).copy() for c in sorted(
+        nx.weakly_connected_components(g_simple), key=len, reverse=True)]
+    length_branches = [len(c) for c in sorted(
+        nx.weakly_connected_components(g_simple), key=len, reverse=True)]
+    print(
+        f'There are {length_branches.count(1)} isolated branches as a result of the junction prunning')
+
+    y_guess = Y_ini.copy()  # Initial guesses for Steady state computation
+    Q_guess = Q_ini.copy()
+    q_guess = q.copy()
+
+    for branch in tqdm(branches):
+        branch_nodes = list(branch.nodes)
+        if len(branch_nodes) > 2:  # Isolated nodes are removed from steady state computation
+            cnp_branch = classes.ChannelNetworkParameters(nx.adjacency_matrix(
+                branch).toarray().T, np.array([]), np.array([]), channel_network.block_coeff_k)
+            
+            y_branch, Q_branch = SS_math_preissmann.SS_computation(
+                y_guess[branch_nodes], Q_guess[branch_nodes], B[branch_nodes], q_guess[branch_nodes], general_params, cnp_branch)
+
+            # update Y_guess
+            y_guess[branch_nodes] = y_branch
+            Q_guess[branch_nodes] = Q_branch
+            
+    return y_guess, Q_guess

@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     general_params = classes.GlobalParameters(g=9.8, dt=3600, dx=50, a=0.6,
                             max_niter_newton=int(1e5), max_niter_inexact=int(1e3), ntimesteps=24,
-                            rel_tol=1e-5, abs_tol=1e-5, weight_A=1e-3, weight_Q=1e-3)
+                            rel_tol=1e-5, abs_tol=1e-5, weight_A=0.022, weight_Q=0.022)
     
     # create a list of channel_network classes in order to be able to loop Pool.starmap through them
     channel_networks = [classes.ChannelNetwork(
